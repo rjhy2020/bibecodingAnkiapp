@@ -143,7 +143,7 @@ class AnkiProviderClient(private val context: Context) {
     }
 
     fun getTodayNewCards(deckId: Long, limit: Int): List<Map<String, Any?>> {
-        val safeLimit = limit.coerceIn(1, 200)
+        val safeLimit = limit.coerceIn(0, 1000)
         val safeDeckId = deckId.coerceAtLeast(0L)
 
         if (!isAnkiDroidInstalled()) {
@@ -166,6 +166,8 @@ class AnkiProviderClient(private val context: Context) {
                 message = "deckId is required",
             )
         }
+
+        if (safeLimit == 0) return emptyList()
 
         val notes = queryNewNotesByDeck(deckId = safeDeckId, limit = safeLimit)
 

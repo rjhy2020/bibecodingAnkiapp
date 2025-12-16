@@ -107,14 +107,21 @@ class HomeController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<List<CardItem>> loadTodayCards({required int deckId}) async {
+  Future<List<CardItem>> loadTodayCards({required int deckId, int? limit}) async {
+    final effectiveLimit = limit ?? todayLimit;
+    if (effectiveLimit <= 0) {
+      lastErrorCode = null;
+      lastErrorMessage = null;
+      return const <CardItem>[];
+    }
+
     loadingCards = true;
     lastErrorCode = null;
     lastErrorMessage = null;
     notifyListeners();
 
     try {
-      return await _api.getTodayNewCards(deckId: deckId, limit: todayLimit);
+      return await _api.getTodayNewCards(deckId: deckId, limit: effectiveLimit);
     } on PlatformException catch (e) {
       debugPrint(
         'Anki getTodayNewCards failed: code=${e.code} message=${e.message} details=${e.details}',

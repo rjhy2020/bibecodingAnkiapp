@@ -35,6 +35,10 @@ class _DeckSelectScreenState extends State<DeckSelectScreen> {
         final decks = controller.decks;
         final selectedId = controller.selectedDeckId;
         final selectedDeck = controller.selectedDeck;
+        final todayNew = selectedDeck?.newCount;
+        final hasNoNewToday = todayNew != null && todayNew <= 0;
+        final effectiveLimit =
+            (todayNew != null && todayNew > 0) ? todayNew : controller.todayLimit;
 
         return Scaffold(
           appBar: AppBar(
@@ -89,12 +93,14 @@ class _DeckSelectScreenState extends State<DeckSelectScreen> {
                       onPressed:
                           (selectedDeck == null ||
                                   controller.loadingCards ||
-                                  !progressController.loaded)
+                                  !progressController.loaded ||
+                                  hasNoNewToday)
                               ? null
                               : () async {
                                   try {
                                     final cards = await controller.loadTodayCards(
                                       deckId: selectedDeck.deckId,
+                                      limit: effectiveLimit,
                                     );
                                     if (!context.mounted) return;
 
@@ -158,7 +164,11 @@ class _DeckSelectScreenState extends State<DeckSelectScreen> {
                           : Text(
                               selectedDeck == null
                                   ? '덱을 선택하세요'
-                                  : '이 덱으로 시작 (${selectedDeck.deckName})',
+                                  : hasNoNewToday
+                                      ? '오늘 새 카드 없음'
+                                      : (todayNew != null
+                                          ? '이 덱으로 시작 (오늘 새 카드 $todayNew개)'
+                                          : '이 덱으로 시작 (${selectedDeck.deckName})'),
                             ),
                     ),
                   ),
