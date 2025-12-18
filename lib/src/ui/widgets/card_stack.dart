@@ -38,13 +38,22 @@ class CardStack extends StatelessWidget {
         key: const ValueKey('layer1'),
         depth: 0,
         child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 180),
+          duration: const Duration(milliseconds: 260),
           switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
           transitionBuilder: (child, animation) {
-            final scale = Tween<double>(begin: 0.96, end: 1.0).animate(
-              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+            final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+            final scale = Tween<double>(begin: 0.965, end: 1.0).animate(curved);
+            final fade = Tween<double>(begin: 0.0, end: 1.0).animate(curved);
+            final slide = Tween<Offset>(begin: const Offset(0, 0.04), end: Offset.zero)
+                .animate(curved);
+            return FadeTransition(
+              opacity: fade,
+              child: SlideTransition(
+                position: slide,
+                child: ScaleTransition(scale: scale, child: child),
+              ),
             );
-            return ScaleTransition(scale: scale, child: child);
           },
           child: SwipeFlipCard(
             key: ValueKey(topCard.cardId),

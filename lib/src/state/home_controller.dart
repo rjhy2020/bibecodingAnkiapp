@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/anki_status.dart';
 import '../models/card_item.dart';
@@ -10,6 +11,46 @@ class HomeController extends ChangeNotifier {
   HomeController(this._api);
 
   final AnkiNativeApi _api;
+  static const String _prefsRecentDeckKey = 'recent_deck_id_v1';
+  SharedPreferences? _prefs;
+  int? _recentDeckId;
+
+  Future<SharedPreferences> _getPrefs() async {
+    _prefs ??= await SharedPreferences.getInstance();
+    return _prefs!;
+  }
+
+  Future<int?> _getRecentDeckId() async {
+    if (_recentDeckId != null) return _recentDeckId;
+    final prefs = await _getPrefs();
+    final id = prefs.getInt(_prefsRecentDeckKey);
+    if (id == null || id <= 0) return null;
+    _recentDeckId = id;
+    return id;
+  }
+
+  Future<void> markDeckStarted(int deckId) async {
+    if (deckId <= 0) return;
+    _recentDeckId = deckId;
+    try {
+      final prefs = await _getPrefs();
+      await prefs.setInt(_prefsRecentDeckKey, deckId);
+    } catch (_) {
+      // ignore
+    }
+
+    selectedDeckId = deckId;
+    if (decks.isNotEmpty) {
+      final list = List<DeckItem>.from(decks);
+      final idx = list.indexWhere((d) => d.deckId == deckId);
+      if (idx > 0) {
+        final d = list.removeAt(idx);
+        list.insert(0, d);
+        decks = list;
+      }
+    }
+    notifyListeners();
+  }
 
   AnkiStatus? status;
   bool loadingStatus = false;
@@ -70,26 +111,37 @@ class HomeController extends ChangeNotifier {
 
     try {
       final list = await _api.getDecks();
-      decks = list;
-
-      if (decks.isNotEmpty) {
-        final currentSelected = selectedDeckId;
-        final stillExists =
-            currentSelected != null &&
-            decks.any((d) => d.deckId == currentSelected);
-        if (!stillExists) {
-          // Default: deck with the largest newCount, otherwise first.
-          decks = List<DeckItem>.from(decks)
-            ..sort((a, b) {
-              final an = a.newCount ?? 0;
-              final bn = b.newCount ?? 0;
-              return bn.compareTo(an);
-            });
-          selectedDeckId = decks.first.deckId;
+      final ordered = List<DeckItem>.from(list);
+      int? nextSelected;
+      final recent = await _getRecentDeckId();
+      if (recent != null) {
+        final idx = ordered.indexWhere((d) => d.deckId == recent);
+        if (idx >= 0) {
+          nextSelected = recent;
+          if (idx > 0) {
+            final d = ordered.removeAt(idx);
+            ordered.insert(0, d);
+          }
         }
-      } else {
-        selectedDeckId = null;
       }
+
+      final currentSelected = selectedDeckId;
+      final stillExists =
+          currentSelected != null && ordered.any((d) => d.deckId == currentSelected);
+      if (nextSelected == null && stillExists) {
+        nextSelected = currentSelected;
+      }
+
+      if (nextSelected == null && ordered.isNotEmpty) {
+        var best = ordered.first;
+        for (final d in ordered) {
+          if ((d.newCount ?? 0) > (best.newCount ?? 0)) best = d;
+        }
+        nextSelected = best.deckId;
+      }
+
+      decks = ordered;
+      selectedDeckId = nextSelected;
     } on PlatformException catch (e) {
       debugPrint(
         'Anki getDecks failed: code=${e.code} message=${e.message} details=${e.details}',

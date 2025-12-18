@@ -130,6 +130,7 @@ class _DeckSelectScreenState extends State<DeckSelectScreen> {
                                       );
                                     }
 
+                                    await controller.markDeckStarted(selectedDeck.deckId);
                                     if (!context.mounted) return;
                                     await Navigator.of(context).push(
                                       StudyScreen.route(

@@ -65,12 +65,14 @@ class StudyCardBackFace extends StatelessWidget {
     super.key,
     required this.card,
     required this.settings,
+    this.showFields = true,
     this.showDeckName = true,
     this.showHint = true,
   });
 
   final CardItem card;
   final ModelStudySettings settings;
+  final bool showFields;
   final bool showDeckName;
   final bool showHint;
 
@@ -80,26 +82,28 @@ class StudyCardBackFace extends StatelessWidget {
     final hidden = settings.hiddenFieldKeys;
 
     final rows = <Widget>[];
-    for (var i = 0; i < card.backFields.length; i++) {
-      final field = card.backFields[i];
-      final key = StudySettingsController.normalizeFieldKey(field.name);
-      if (hidden.contains(key)) continue;
+    if (showFields) {
+      for (var i = 0; i < card.backFields.length; i++) {
+        final field = card.backFields[i];
+        final key = StudySettingsController.normalizeFieldKey(field.name);
+        if (hidden.contains(key)) continue;
 
-      final clean = stripHtmlToPlainText(field.value);
-      if (clean.trim().isEmpty) continue;
-      if (i == 0 && clean == front) continue;
+        final clean = stripHtmlToPlainText(field.value);
+        if (clean.trim().isEmpty) continue;
+        if (i == 0 && clean == front) continue;
 
-      rows.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: _FieldRow(
-            name: field.name,
-            value: clean,
-            showLabel: settings.showFieldLabels,
-            fontSize: settings.backBodyFontSize,
+        rows.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _FieldRow(
+              name: field.name,
+              value: clean,
+              showLabel: settings.showFieldLabels,
+              fontSize: settings.backBodyFontSize,
+            ),
           ),
-        ),
-      );
+        );
+      }
     }
 
     return Column(

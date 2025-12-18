@@ -41,6 +41,7 @@ class _StudyScreenState extends State<StudyScreen> {
   StudySessionController? _session;
   String _lastAutoSpokenCardId = '';
   bool _wasComplete = false;
+  Timer? _autoSpeakTimer;
 
   @override
   void initState() {
@@ -74,12 +75,20 @@ class _StudyScreenState extends State<StudyScreen> {
 
     _wasComplete = false;
 
-    if (!_ttsReady) return;
     final card = session.currentCard;
     if (card == null) return;
     if (_lastAutoSpokenCardId == card.cardId) return;
     _lastAutoSpokenCardId = card.cardId;
-    _speak(card.frontText);
+
+    _autoSpeakTimer?.cancel();
+    final cardId = card.cardId;
+    final text = card.frontText;
+    _autoSpeakTimer = Timer(const Duration(milliseconds: 140), () {
+      if (!mounted) return;
+      final current = _session?.currentCard;
+      if (current == null || current.cardId != cardId) return;
+      _speak(text);
+    });
   }
 
   Future<void> _initTts() async {
@@ -109,9 +118,15 @@ class _StudyScreenState extends State<StudyScreen> {
     }
   }
 
+  Future<void> _speakManual(String raw) async {
+    _autoSpeakTimer?.cancel();
+    await _speak(raw);
+  }
+
   @override
   void dispose() {
     _session?.removeListener(_onSessionChanged);
+    _autoSpeakTimer?.cancel();
     _tts.stop();
     super.dispose();
   }
@@ -182,7 +197,7 @@ class _StudyScreenState extends State<StudyScreen> {
                           topCard: session.currentCard!,
                           secondCard: session.peek(1),
                           thirdCard: session.peek(2),
-                          onSpeak: _speak,
+                          onSpeak: _speakManual,
                           onSwiped: session.swipeNext,
                         ),
                       ),
