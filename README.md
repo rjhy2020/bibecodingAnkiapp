@@ -8,6 +8,7 @@ AnkiDroid를 사용 중일 때, **오늘 볼 “새 카드(is:new)”를 앱에�
 ## 기능(1차 MVP)
 - Home: AnkiDroid 연결 상태 표시 + “학습 시작” 버튼
 - 덱 선택: 학습 전 덱 1개 선택
+- (추가) Gemini 자동 생성: 덱 시작 시 예문/뉘앙스 자동 생성 → Anki 필드에 append 적용
 - Study:
   - 상단: Total / Remaining
   - 상단: 회독/목표(덱별/오늘 기준, 디바이스 저장) + 목표 탭해서 수정
@@ -15,6 +16,7 @@ AnkiDroid를 사용 중일 때, **오늘 볼 “새 카드(is:new)”를 앱에�
   - 카드 표시 설정(노트 타입별): 필드명 표시/숨김 + 폰트 크기 조절(디바이스 저장)
   - 앞면: 자동 TTS 1회, 탭 시 TTS 1회 + Y축 180도 플립(뒷면)
   - 뒷면: 탭(또는 오른쪽 스와이프)으로 다음 카드(Remaining 감소)
+  - 뒷면: “딥 뉘앙스” 버튼(로컬 캐시 기반 팝업)
   - 완료 화면: “오늘 미리보기 완료” + 다시 시작/홈으로
 - TTS: `flutter_tts` (기본 `en-US`, speechRate `0.5`)
 - Anki 스케줄 변경: **MVP에서는 하지 않음(안전).**
@@ -45,16 +47,26 @@ lib/
   main.dart
   src/
     app.dart
+    config/
+      local_secrets.example.dart
     models/
       anki_status.dart
       card_item.dart
+      gemini_analysis.dart
+      llm_deck_config.dart
     services/
       anki_native_api.dart
+      deep_nuance_cache.dart
+      gemini_client.dart
     state/
       home_controller.dart
+      llm_deck_config_controller.dart
       study_session_controller.dart
     ui/
+      deep_nuance_dialog.dart
       home_screen.dart
+      llm_autofill_screen.dart
+      llm_deck_config_sheet.dart
       study_screen.dart
       widgets/
         card_stack.dart
@@ -78,6 +90,17 @@ android/app/src/main/
    - `flutter pub get`
    - `flutter run`
 5. 앱 Home에서 상태가 OK가 되면 “학습 시작” → 카드 스택/플립/스와이프/TTS 확인
+
+## Gemini 자동 생성 설정(로컬 전용)
+> 주의: 이 방식은 **API 키가 앱에 포함**될 수 있으므로 “나만 사용” 전제로만 추천합니다.
+
+1. `lib/src/config/local_secrets.example.dart`를 참고해서,
+2. 로컬에 `lib/src/config/local_secrets.dart`를 만들고(이 파일은 `.gitignore`에 포함됨),
+3. `geminiApiKey`에 본인 키를 붙여넣습니다.
+
+덱을 처음 시작하면:
+- 단어 필드 / 뜻(정의) 필드 / 붙여넣기(출력) 필드를 1회 선택
+- 이후부터는 덱 시작 시 자동으로 생성/적용됩니다.
 
 ## 흔한 오류/해결
 ### 1) AnkiDroid 미설치

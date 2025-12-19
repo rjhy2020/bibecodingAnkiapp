@@ -10,6 +10,13 @@ class FieldItem {
       value: (map['value'] as String?) ?? '',
     );
   }
+
+  FieldItem copyWith({String? name, String? value}) {
+    return FieldItem(
+      name: name ?? this.name,
+      value: value ?? this.value,
+    );
+  }
 }
 
 class CardItem {
@@ -42,6 +49,22 @@ class CardItem {
       deckName: (map['deckName'] as String?) ?? 'Unknown Deck',
       frontText: (map['frontText'] as String?) ?? '',
       backFields: backFields,
+    );
+  }
+
+  CardItem copyWith({
+    String? cardId,
+    int? modelId,
+    String? deckName,
+    String? frontText,
+    List<FieldItem>? backFields,
+  }) {
+    return CardItem(
+      cardId: cardId ?? this.cardId,
+      modelId: modelId ?? this.modelId,
+      deckName: deckName ?? this.deckName,
+      frontText: frontText ?? this.frontText,
+      backFields: backFields ?? this.backFields,
     );
   }
 }

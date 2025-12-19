@@ -50,4 +50,24 @@ class AnkiNativeApi {
     final granted = await _channel.invokeMethod<bool>('requestAnkiPermission');
     return granted == true;
   }
+
+  Future<Map<String, dynamic>> appendToNoteField({
+    required int noteId,
+    required int modelId,
+    required String targetFieldKey,
+    required String generatedText,
+  }) async {
+    final map = await _channel.invokeMethod<Map<dynamic, dynamic>>(
+      'appendToNoteField',
+      {
+        'noteId': noteId,
+        'modelId': modelId,
+        'targetFieldKey': targetFieldKey,
+        'generatedText': generatedText,
+      },
+    );
+    return (map ?? const {}).map(
+      (key, value) => MapEntry(key.toString(), value),
+    );
+  }
 }

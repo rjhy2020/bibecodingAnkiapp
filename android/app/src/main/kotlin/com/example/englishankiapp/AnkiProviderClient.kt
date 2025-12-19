@@ -1,10 +1,11 @@
 package com.example.englishankiapp
 
 import android.content.ContentResolver
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
-import android.database.Cursor
 import android.net.Uri
+import android.database.Cursor
 
 class AnkiProviderClient(private val context: Context) {
     private val resolver: ContentResolver get() = context.contentResolver
@@ -202,6 +203,142 @@ class AnkiProviderClient(private val context: Context) {
         return result
     }
 
+    fun appendToNoteField(
+        noteId: Long,
+        modelId: Long,
+        targetFieldKey: String,
+        generatedText: String,
+        marker: String = "1122",
+    ): Map<String, Any?> {
+        val safeNoteId = noteId.coerceAtLeast(0L)
+        val safeModelId = modelId.coerceAtLeast(0L)
+        val key = targetFieldKey.trim().lowercase()
+        val payload = generatedText.trimEnd().let { if (it.isEmpty()) "" else "$it<br>$marker" }
+
+        if (safeNoteId <= 0L) {
+            throw AnkiApiException(code = "INVALID_ARGUMENT", message = "noteId is required")
+        }
+        if (safeModelId <= 0L) {
+            throw AnkiApiException(code = "INVALID_ARGUMENT", message = "modelId is required")
+        }
+        if (key.isEmpty()) {
+            throw AnkiApiException(code = "INVALID_ARGUMENT", message = "targetFieldKey is required")
+        }
+        if (payload.isEmpty()) {
+            throw AnkiApiException(code = "INVALID_ARGUMENT", message = "generatedText is empty")
+        }
+
+        if (!isAnkiDroidInstalled()) {
+            throw AnkiApiException(code = "ANKI_NOT_INSTALLED", message = "AnkiDroid is not installed")
+        }
+        if (!isAnkiProviderVisible()) {
+            throw AnkiApiException(
+                code = "ANKI_PROVIDER_NOT_FOUND",
+                message = "AnkiDroid ContentProvider not found. Check AndroidManifest <queries>."
+            )
+        }
+
+        val fieldNames = getModelFieldNames(safeModelId)
+            ?: throw AnkiApiException(code = "ANKI_SCHEMA_MISMATCH", message = "Unable to load model field names.")
+
+        val fieldIndex = fieldNames.indexOfFirst { it.trim().lowercase() == key }
+        if (fieldIndex < 0) {
+            throw AnkiApiException(
+                code = "FIELD_NOT_FOUND",
+                message = "Field not found in model: $targetFieldKey",
+                details = fieldNames,
+            )
+        }
+
+        // Read current flds.
+        val existingFlds = queryNoteFlds(noteId = safeNoteId)
+        val fields = splitFields(existingFlds).toMutableList()
+        if (fieldIndex >= fields.size) {
+            throw AnkiApiException(
+                code = "ANKI_SCHEMA_MISMATCH",
+                message = "Field index out of range ($fieldIndex/${fields.size}).",
+            )
+        }
+
+        val existingValue = fields[fieldIndex]
+        if (existingValue.contains(marker)) {
+            return mapOf(
+                "status" to "skipped",
+                "reason" to "MARKER_PRESENT",
+                "newValue" to existingValue,
+            )
+        }
+
+        val newValue = if (existingValue.trim().isEmpty()) {
+            payload
+        } else {
+            existingValue.trimEnd() + "<br><br>" + payload
+        }
+
+        fields[fieldIndex] = newValue
+        val joined = fields.joinToString(separator = "\u001f")
+
+        val values = ContentValues().apply {
+            put("flds", joined)
+        }
+
+        // Try to update using notes/<id> first, then fall back.
+        val noteUri = Uri.withAppendedPath(notesUri, safeNoteId.toString())
+        try {
+            val updated = resolver.update(noteUri, values, null, null)
+            if (updated <= 0) {
+                val updated2 = resolver.update(notesUri, values, "id=?", arrayOf(safeNoteId.toString()))
+                if (updated2 <= 0) {
+                    val updated3 = resolver.update(notesV2Uri, values, "id=?", arrayOf(safeNoteId.toString()))
+                    if (updated3 <= 0) {
+                        throw AnkiApiException(
+                            code = "ANKI_UPDATE_FAILED",
+                            message = "Provider update returned 0 rows.",
+                        )
+                    }
+                }
+            }
+        } catch (e: SecurityException) {
+            throw AnkiApiException(
+                code = "ANKI_PERMISSION_DENIED",
+                message = "AnkiDroid provider access denied (SecurityException).",
+                details = e.message,
+            )
+        } catch (e: IllegalArgumentException) {
+            // Fallback: update via selection only.
+            val updated2 = try {
+                resolver.update(notesUri, values, "id=?", arrayOf(safeNoteId.toString()))
+            } catch (_: Throwable) {
+                0
+            }
+            if (updated2 <= 0) {
+                val updated3 = try {
+                    resolver.update(notesV2Uri, values, "id=?", arrayOf(safeNoteId.toString()))
+                } catch (_: Throwable) {
+                    0
+                }
+                if (updated3 <= 0) {
+                    throw AnkiApiException(
+                        code = "ANKI_UPDATE_FAILED",
+                        message = "Note update failed (unsupported URI).",
+                        details = e.toString(),
+                    )
+                }
+            }
+        } catch (e: Throwable) {
+            throw AnkiApiException(
+                code = "ANKI_UPDATE_FAILED",
+                message = "Note update failed.",
+                details = e.toString(),
+            )
+        }
+
+        return mapOf(
+            "status" to "updated",
+            "newValue" to newValue,
+        )
+    }
+
     fun openAnkiDroid(): Boolean {
         if (!isAnkiDroidInstalled()) return false
         val intent = context.packageManager.getLaunchIntentForPackage(ANKI_PACKAGE) ?: return false
@@ -288,6 +425,42 @@ class AnkiProviderClient(private val context: Context) {
             throw AnkiApiException(
                 code = "ANKI_QUERY_FAILED",
                 message = "Failed to query new notes by deck.",
+                details = e.toString(),
+            )
+        }
+    }
+
+    private fun queryNoteFlds(noteId: Long): String {
+        val projection = arrayOf("_id", "flds")
+        val selection = "id=?"
+        val args = arrayOf(noteId.toString())
+        try {
+            val cursor = resolver.query(notesV2Uri, projection, selection, args, null)
+                ?: throw AnkiApiException(code = "ANKI_NULL_CURSOR", message = "Provider returned null cursor.")
+            cursor.use {
+                val fldsIdx = it.getColumnIndexOrNull("flds")
+                if (fldsIdx == null) {
+                    throw AnkiApiException(
+                        code = "ANKI_SCHEMA_MISMATCH",
+                        message = "Unexpected notes schema from provider (missing flds).",
+                        details = it.columnNames.toList(),
+                    )
+                }
+                if (!it.moveToFirst()) {
+                    throw AnkiApiException(code = "NOTE_NOT_FOUND", message = "Note not found: $noteId")
+                }
+                return it.getString(fldsIdx) ?: ""
+            }
+        } catch (e: SecurityException) {
+            throw AnkiApiException(
+                code = "ANKI_PERMISSION_DENIED",
+                message = "AnkiDroid provider access denied (SecurityException).",
+                details = e.message,
+            )
+        } catch (e: Throwable) {
+            throw AnkiApiException(
+                code = "ANKI_QUERY_FAILED",
+                message = "Failed to read note fields.",
                 details = e.toString(),
             )
         }

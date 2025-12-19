@@ -68,6 +68,7 @@ class StudyCardBackFace extends StatelessWidget {
     this.showFields = true,
     this.showDeckName = true,
     this.showHint = true,
+    this.onDeepNuance,
   });
 
   final CardItem card;
@@ -75,6 +76,7 @@ class StudyCardBackFace extends StatelessWidget {
   final bool showFields;
   final bool showDeckName;
   final bool showHint;
+  final VoidCallback? onDeepNuance;
 
   @override
   Widget build(BuildContext context) {
@@ -110,11 +112,24 @@ class StudyCardBackFace extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (showDeckName)
-          Text(
-            card.deckName,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.black54),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  card.deckName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.black54),
+                ),
+              ),
+              if (onDeepNuance != null)
+                IconButton(
+                  onPressed: onDeepNuance,
+                  icon: const Icon(Icons.psychology_alt_outlined),
+                  tooltip: '딥 뉘앙스',
+                  visualDensity: VisualDensity.compact,
+                ),
+            ],
           ),
         if (showDeckName) const SizedBox(height: 8),
         Text(

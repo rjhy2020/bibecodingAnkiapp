@@ -36,6 +36,9 @@ migrate_working_dir/
 # Symbolication related
 app.*.symbols
 
+# Local secrets (do not commit)
+lib/src/config/local_secrets.dart
+
 # Obfuscation related
 app.*.map.json
 

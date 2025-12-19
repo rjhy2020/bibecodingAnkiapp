@@ -42,6 +42,7 @@ class _StudyScreenState extends State<StudyScreen> {
   String _lastAutoSpokenCardId = '';
   bool _wasComplete = false;
   Timer? _autoSpeakTimer;
+  bool _goalPrompted = false;
 
   @override
   void initState() {
@@ -49,6 +50,27 @@ class _StudyScreenState extends State<StudyScreen> {
     _tts = FlutterTts();
     _initTts();
     WidgetsBinding.instance.addPostFrameCallback((_) => _attachSessionListener());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureDailyGoal());
+  }
+
+  Future<void> _ensureDailyGoal() async {
+    if (_goalPrompted) return;
+    _goalPrompted = true;
+
+    final progress = context.read<DailyDeckProgressController>();
+    while (mounted && !progress.loaded) {
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+    }
+    if (!mounted) return;
+    if (progress.hasGoalForDeck(widget.deckId)) return;
+
+    final goal = await askDailyGoalRounds(
+      context: context,
+      deckName: widget.deckName,
+      initialGoal: 1,
+    );
+    if (!mounted) return;
+    await progress.setGoalForDeck(widget.deckId, goal);
   }
 
   void _attachSessionListener() {

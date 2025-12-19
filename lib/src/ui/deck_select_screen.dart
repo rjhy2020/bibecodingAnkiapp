@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/deck_item.dart';
-import '../state/daily_deck_progress_controller.dart';
 import '../state/home_controller.dart';
-import 'daily_goal_dialog.dart';
-import 'study_screen.dart';
+import 'llm_autofill_screen.dart';
 
 class DeckSelectScreen extends StatefulWidget {
   const DeckSelectScreen({super.key});
@@ -29,7 +26,6 @@ class _DeckSelectScreenState extends State<DeckSelectScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final progressController = context.watch<DailyDeckProgressController>();
     return Consumer<HomeController>(
       builder: (context, controller, _) {
         final decks = controller.decks;
@@ -93,68 +89,18 @@ class _DeckSelectScreenState extends State<DeckSelectScreen> {
                       onPressed:
                           (selectedDeck == null ||
                                   controller.loadingCards ||
-                                  !progressController.loaded ||
                                   hasNoNewToday)
                               ? null
                               : () async {
-                                  try {
-                                    final cards = await controller.loadTodayCards(
+                                  await controller.markDeckStarted(selectedDeck.deckId);
+                                  if (!context.mounted) return;
+                                  await Navigator.of(context).push(
+                                    LlmAutofillScreen.route(
                                       deckId: selectedDeck.deckId,
+                                      deckName: selectedDeck.deckName,
                                       limit: effectiveLimit,
-                                    );
-                                    if (!context.mounted) return;
-
-                                    if (cards.isEmpty) {
-                                      await Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => _EmptyCardsScreen(
-                                            deckName: selectedDeck.deckName,
-                                          ),
-                                        ),
-                                      );
-                                      return;
-                                    }
-
-                                    if (!progressController.hasGoalForDeck(
-                                      selectedDeck.deckId,
-                                    )) {
-                                      final goal = await askDailyGoalRounds(
-                                        context: context,
-                                        deckName: selectedDeck.deckName,
-                                        initialGoal: 1,
-                                      );
-                                      if (!context.mounted) return;
-                                      await progressController.setGoalForDeck(
-                                        selectedDeck.deckId,
-                                        goal,
-                                      );
-                                    }
-
-                                    await controller.markDeckStarted(selectedDeck.deckId);
-                                    if (!context.mounted) return;
-                                    await Navigator.of(context).push(
-                                      StudyScreen.route(
-                                        deckId: selectedDeck.deckId,
-                                        deckName: selectedDeck.deckName,
-                                        cards: cards,
-                                      ),
-                                    );
-                                  } on PlatformException catch (e) {
-                                    if (!context.mounted) return;
-                                    final details = e.details?.toString();
-                                    final message = e.message;
-                                    final combined =
-                                        (details == null || details.isEmpty)
-                                            ? message
-                                            : '${message ?? ''}\n$details';
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          combined ?? 'AnkiDroid 데이터 조회 실패',
-                                        ),
-                                      ),
-                                    );
-                                  }
+                                    ),
+                                  );
                                 },
                       child: controller.loadingCards
                           ? const SizedBox(
@@ -301,29 +247,6 @@ class _EmptyDecksState extends StatelessWidget {
               ],
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyCardsScreen extends StatelessWidget {
-  const _EmptyCardsScreen({required this.deckName});
-
-  final String deckName;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('오늘 새 카드')),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            '선택한 덱에 오늘 보여줄 새 카드가 없음\n($deckName)',
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-          ),
         ),
       ),
     );

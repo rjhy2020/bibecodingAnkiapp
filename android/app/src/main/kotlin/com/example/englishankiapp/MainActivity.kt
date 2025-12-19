@@ -75,6 +75,36 @@ class MainActivity : FlutterActivity() {
                         }
                     }
 
+                    "appendToNoteField" -> {
+                        val noteId = (call.argument<Number>("noteId") ?: 0).toLong()
+                        val modelId = (call.argument<Number>("modelId") ?: 0).toLong()
+                        val targetFieldKey = call.argument<String>("targetFieldKey") ?: ""
+                        val generatedText = call.argument<String>("generatedText") ?: ""
+                        ioExecutor.execute {
+                            try {
+                                val res = client.appendToNoteField(
+                                    noteId = noteId,
+                                    modelId = modelId,
+                                    targetFieldKey = targetFieldKey,
+                                    generatedText = generatedText,
+                                )
+                                runOnUiThread { result.success(res) }
+                            } catch (e: AnkiApiException) {
+                                runOnUiThread { result.error(e.code, e.message, e.details) }
+                            } catch (e: SecurityException) {
+                                runOnUiThread {
+                                    result.error(
+                                        "ANKI_PERMISSION_DENIED",
+                                        "SecurityException: ${e.message}",
+                                        null
+                                    )
+                                }
+                            } catch (e: Throwable) {
+                                runOnUiThread { result.error("ANKI_UNKNOWN", e.toString(), null) }
+                            }
+                        }
+                    }
+
                     "openPlayStore" -> {
                         val ok = client.openPlayStore()
                         if (ok) result.success(true) else result.error(

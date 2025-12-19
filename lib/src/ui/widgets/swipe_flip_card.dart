@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../models/card_item.dart';
 import '../../state/study_settings_controller.dart';
 import 'study_card_faces.dart';
+import '../deep_nuance_dialog.dart';
 
 class SwipeFlipCard extends StatefulWidget {
   const SwipeFlipCard({
@@ -150,6 +151,7 @@ class _SwipeFlipCardState extends State<SwipeFlipCard>
         card: widget.card,
         settings: settings,
         showFields: _buildBackContent,
+        onDeepNuance: () => showDeepNuanceDialog(context, widget.card),
       ),
     );
 
