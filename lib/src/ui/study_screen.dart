@@ -178,6 +178,11 @@ class _StudyScreenState extends State<StudyScreen> {
             title: Text('학습 • ${widget.deckName}'),
             actions: [
               IconButton(
+                onPressed: session.canUndo ? session.undo : null,
+                icon: const Icon(Icons.undo_rounded),
+                tooltip: '되돌리기',
+              ),
+              IconButton(
                 onPressed: () {
                   final card = session.currentCard;
                   if (card == null) return;

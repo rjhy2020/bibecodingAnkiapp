@@ -12,11 +12,13 @@ class SwipeFlipCard extends StatefulWidget {
   const SwipeFlipCard({
     super.key,
     required this.card,
+    required this.height,
     required this.onSpeak,
     required this.onSwiped,
   });
 
   final CardItem card;
+  final double height;
   final Future<void> Function(String text) onSpeak;
   final VoidCallback onSwiped;
 
@@ -103,17 +105,28 @@ class _SwipeFlipCardState extends State<SwipeFlipCard>
     setState(() => _isBack = true);
   }
 
+  void _onHorizontalDragStart(DragStartDetails details) {
+    if (_flip.isAnimating) return;
+    if (_swipe.isAnimating) {
+      _swipe.stop(canceled: true);
+      _swipeOut = false;
+    }
+  }
+
   void _onHorizontalDragUpdate(DragUpdateDetails details) {
     final current = _drag.value;
-    final nextDx = math.max(0.0, current.dx + details.delta.dx);
+    final maxDx = MediaQuery.sizeOf(context).width;
+    final nextDx = (current.dx + details.delta.dx).clamp(0.0, maxDx);
     _drag.value = Offset(nextDx, 0);
   }
 
   void _onHorizontalDragEnd(DragEndDetails details) {
     final size = MediaQuery.sizeOf(context);
     final threshold = size.width * 0.22;
-    if (_drag.value.dx >= threshold) {
-      _animateOut();
+    final vx = details.velocity.pixelsPerSecond.dx;
+    final shouldOut = _drag.value.dx >= threshold || vx >= 1200;
+    if (shouldOut) {
+      _animateOut(velocity: vx);
     } else {
       _animateBack();
     }
@@ -124,16 +137,25 @@ class _SwipeFlipCardState extends State<SwipeFlipCard>
     _swipeStart = _drag.value;
     _swipeEnd = Offset.zero;
     _swipeOut = false;
+    final width = MediaQuery.sizeOf(context).width;
+    final dx = _swipeStart.dx.abs().clamp(0.0, width);
+    final ms = (140 + (dx / width) * 160).round().clamp(140, 280);
+    _swipe.duration = Duration(milliseconds: ms);
     _swipe.forward(from: 0);
   }
 
-  void _animateOut() {
+  void _animateOut({double? velocity}) {
     final size = MediaQuery.sizeOf(context);
-    final end = Offset(size.width * 1.4, 0);
-    _swipeCurve = Curves.easeInCubic;
+    final end = Offset(size.width * 1.35, 0);
+    _swipeCurve = Curves.decelerate;
     _swipeStart = _drag.value;
     _swipeEnd = end;
     _swipeOut = true;
+    final distance = math.max(0.0, end.dx - _swipeStart.dx);
+    final vx = math.max(0.0, velocity ?? 0.0);
+    final computedMs = vx > 200 ? (distance / vx * 1000).round() : 240;
+    final ms = computedMs.clamp(160, 340);
+    _swipe.duration = Duration(milliseconds: ms);
     _swipe.forward(from: 0);
   }
 
@@ -168,17 +190,17 @@ class _SwipeFlipCardState extends State<SwipeFlipCard>
             transform: Matrix4.identity()
               ..setEntry(3, 2, 0.0015)
               ..rotateY(angle),
-            child: Material(
-              elevation: 6,
-              color: scheme.surface,
-              borderRadius: BorderRadius.circular(18),
-              child: Container(
-                height: 460,
-                width: double.infinity,
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
+                child: Material(
+                  elevation: 6,
+                  color: scheme.surface,
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+                  child: Container(
+                    height: widget.height,
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
                 ),
                 child: face,
               ),
@@ -191,6 +213,7 @@ class _SwipeFlipCardState extends State<SwipeFlipCard>
     return GestureDetector(
       onTap: _handleTap,
       onLongPress: () => widget.onSpeak(widget.card.frontText),
+      onHorizontalDragStart: _isBack ? _onHorizontalDragStart : null,
       onHorizontalDragUpdate: _isBack ? _onHorizontalDragUpdate : null,
       onHorizontalDragEnd: _isBack ? _onHorizontalDragEnd : null,
       child: ValueListenableBuilder<Offset>(

@@ -12,6 +12,7 @@ class StudySessionController extends ChangeNotifier {
   int get remaining => (cards.length - index).clamp(0, cards.length);
 
   bool get isComplete => index >= cards.length;
+  bool get canUndo => index > 0;
 
   CardItem? get currentCard => isComplete ? null : cards[index];
   CardItem? peek(int offset) {
@@ -26,9 +27,14 @@ class StudySessionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void undo() {
+    if (!canUndo) return;
+    index--;
+    notifyListeners();
+  }
+
   void restart() {
     index = 0;
     notifyListeners();
   }
 }
-

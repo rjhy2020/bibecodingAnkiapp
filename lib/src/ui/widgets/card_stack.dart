@@ -21,53 +21,62 @@ class CardStack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final layers = <Widget>[
-      if (thirdCard != null)
-        _DeckLayer(
-          key: const ValueKey('layer3'),
-          depth: 2,
-          child: _DecorativeCardPlaceholder(),
-        ),
-      if (secondCard != null)
-        _DeckLayer(
-          key: const ValueKey('layer2'),
-          depth: 1,
-          child: _DecorativeCardPlaceholder(),
-        ),
-      _DeckLayer(
-        key: const ValueKey('layer1'),
-        depth: 0,
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 260),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
-          transitionBuilder: (child, animation) {
-            final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
-            final scale = Tween<double>(begin: 0.965, end: 1.0).animate(curved);
-            final fade = Tween<double>(begin: 0.0, end: 1.0).animate(curved);
-            final slide = Tween<Offset>(begin: const Offset(0, 0.04), end: Offset.zero)
-                .animate(curved);
-            return FadeTransition(
-              opacity: fade,
-              child: SlideTransition(
-                position: slide,
-                child: ScaleTransition(scale: scale, child: child),
-              ),
-            );
-          },
-          child: SwipeFlipCard(
-            key: ValueKey(topCard.cardId),
-            card: topCard,
-            onSpeak: onSpeak,
-            onSwiped: onSwiped,
-          ),
-        ),
-      ),
-    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxH = constraints.maxHeight;
+        final desired = (maxH * 0.92).clamp(460.0, 620.0);
+        final cardHeight = desired > maxH ? maxH : desired;
 
-    return Stack(
-      alignment: Alignment.center,
-      children: layers,
+        final layers = <Widget>[
+          if (thirdCard != null)
+            _DeckLayer(
+              key: const ValueKey('layer3'),
+              depth: 2,
+              child: _DecorativeCardPlaceholder(height: cardHeight),
+            ),
+          if (secondCard != null)
+            _DeckLayer(
+              key: const ValueKey('layer2'),
+              depth: 1,
+              child: _DecorativeCardPlaceholder(height: cardHeight),
+            ),
+          _DeckLayer(
+            key: const ValueKey('layer1'),
+            depth: 0,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 260),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) {
+                final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+                final scale = Tween<double>(begin: 0.965, end: 1.0).animate(curved);
+                final fade = Tween<double>(begin: 0.0, end: 1.0).animate(curved);
+                final slide =
+                    Tween<Offset>(begin: const Offset(0, 0.04), end: Offset.zero).animate(curved);
+                return FadeTransition(
+                  opacity: fade,
+                  child: SlideTransition(
+                    position: slide,
+                    child: ScaleTransition(scale: scale, child: child),
+                  ),
+                );
+              },
+              child: SwipeFlipCard(
+                key: ValueKey(topCard.cardId),
+                card: topCard,
+                height: cardHeight,
+                onSpeak: onSpeak,
+                onSwiped: onSwiped,
+              ),
+            ),
+          ),
+        ];
+
+        return Stack(
+          alignment: Alignment.center,
+          children: layers,
+        );
+      },
     );
   }
 }
@@ -95,6 +104,10 @@ class _DeckLayer extends StatelessWidget {
 }
 
 class _DecorativeCardPlaceholder extends StatelessWidget {
+  const _DecorativeCardPlaceholder({required this.height});
+
+  final double height;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -103,7 +116,7 @@ class _DecorativeCardPlaceholder extends StatelessWidget {
       color: scheme.surface,
       borderRadius: BorderRadius.circular(18),
       child: Container(
-        height: 460,
+        height: height,
         width: double.infinity,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),

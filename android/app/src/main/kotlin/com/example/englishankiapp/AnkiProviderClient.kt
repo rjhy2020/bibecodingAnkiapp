@@ -369,14 +369,14 @@ class AnkiProviderClient(private val context: Context) {
     private fun queryNewNotesByDeck(deckId: Long, limit: Int): List<NoteRow> {
         val projection = arrayOf("_id", "mid", "flds", "sfld")
         // We use notes_v2 (direct SQL) to filter by deck + "new" card state and to order by
-        // card modification time (oldest first).
+        // card creation time (oldest first). In Anki, cards.id is a timestamp-based id.
         //
         // Anki DB schema: cards.did, cards.type, cards.queue, cards.mod, cards.nid, notes.id
         val selection = "id IN (SELECT nid FROM cards WHERE did=? AND type=0 AND queue=0)"
         val selectionArgs = arrayOf(deckId.toString())
         // ORDER BY does not accept selectionArgs in Android's query() API, so embed the numeric deckId.
         val order =
-            "(SELECT MIN(mod) FROM cards WHERE cards.nid = notes.id AND did=$deckId AND type=0 AND queue=0) ASC, id ASC"
+            "(SELECT MIN(cards.id) FROM cards WHERE cards.nid = notes.id AND did=$deckId AND type=0 AND queue=0) ASC, id ASC"
 
         try {
             val cursor = resolver.query(notesV2Uri, projection, selection, selectionArgs, order) ?: return emptyList()
